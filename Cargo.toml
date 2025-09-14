@@ -1,0 +1,10 @@
+[package]
+name = "surviver"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.16.1"
+rand = "0.9.2"
+avian2d = "0.3"
+bevy_egui = "0.36.0"
