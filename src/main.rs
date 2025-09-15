@@ -10,7 +10,7 @@ fn main() {
         .add_systems(Update, player_move_system)
         .add_event::<AttacEvent>()
         .add_systems(Update, 
-            (enemy_attack_system, handle_attack_events))
+            (enemy_attack_system, handle_attack_events, enemy_move_system))
         .add_systems(Update, lifebar_system)
         .add_plugins(EguiPlugin::default())
         .add_systems(EguiPrimaryContextPass, ui_system)
@@ -20,6 +20,7 @@ fn main() {
 fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
     
+    //プレイヤー
     commands.spawn((
         Sprite{
             color: Color::srgb(0.25, 0.75, 0.25),
@@ -48,7 +49,7 @@ fn setup(mut commands: Commands) {
                 Transform::from_translation(Vec3::new(0.0, 20.0, 0.1)),),
         ],
     ));
-
+    //敵
     commands.spawn((
         Sprite{
             color: Color::srgb(0.75, 0.25, 0.25),
@@ -141,6 +142,20 @@ fn enemy_attack_system(
                 (*entity2, *entity1)
             };
             attack_events.write(AttacEvent { attacker, target });
+        }
+    }
+}
+
+fn enemy_move_system(
+    mut enemy_query: Query<&mut Transform, (With<Enemy>, Without<Player>)>,
+    player_query: Query<&Transform, (With<Player>, Without<Enemy>)>,
+    time: Res<Time>,
+) {
+    if let Ok(player_transform) = player_query.single() {
+        for mut enemy_transform in enemy_query.iter_mut() {
+            let direction = (player_transform.translation - enemy_transform.translation).normalize();
+            const ENEMY_MOVE_SPEED:f32 = 50.0;
+            enemy_transform.translation += direction * ENEMY_MOVE_SPEED * time.delta_secs();
         }
     }
 }
