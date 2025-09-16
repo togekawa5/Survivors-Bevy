@@ -1,6 +1,7 @@
-use bevy::prelude::*;
+use bevy::{prelude::*};
 use avian2d::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
+use rand::{Rng};
 
 fn main() {
     App::new()
@@ -9,6 +10,8 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(Update, player_move_system)
         .add_event::<AttacEvent>()
+        .insert_resource(SpawnTimer(Timer::from_seconds(2.0, TimerMode::Repeating)))
+        .add_systems(Update, enemy_spawn_system)
         .add_systems(Update, 
             (enemy_attack_system, handle_attack_events, toward_player_system))
         .add_systems(Update, lifebar_system)
@@ -50,20 +53,10 @@ fn setup(mut commands: Commands) {
         ],
     ));
     //敵
-    commands.spawn((
-        Sprite{
-            color: Color::srgb(0.75, 0.25, 0.25),
-            custom_size: Some(Vec2::new(30.0, 30.0)),
-            ..Default::default()
-        },
-        Transform::from_translation(Vec3::new(100.0, 0.0, 0.0)),
-        Enemy,
-        TowardPlayer { speed: 50.0 },
-        RigidBody::Kinematic,
-        Collider::rectangle(30.0, 30.0),
-        Health { current: 50, max: 50 },
-        Attack { damage: 10 },
-    )); 
+    commands.spawn(make_enemy_bundle(
+        Color::srgb(0.75, 0.25, 0.25),
+        Vec3::new(100.0, 0.0, 0.0),
+    ));
 }
 
 #[derive(Component)]
@@ -122,6 +115,48 @@ struct AttacEvent{
     attacker: Entity,
     target: Entity,
 }
+
+
+fn make_enemy_bundle(
+    color: Color,
+    position: Vec3,
+) -> impl Bundle {
+    (
+        Sprite{
+            color: color,
+            custom_size: Some(Vec2::new(30.0, 30.0)),
+            ..Default::default()
+        },
+        Transform::from_translation(position),
+        Enemy,
+        RigidBody::Kinematic,
+        Collider::rectangle(30.0, 30.0),
+        Health { current: 50, max: 50 },
+        Attack { damage: 10 },
+    ) 
+}
+
+#[derive(Resource)]
+struct SpawnTimer(Timer);
+
+fn enemy_spawn_system(
+    mut commands: Commands,
+    mut timer: ResMut<SpawnTimer>,
+    time: Res<Time>,
+){
+    if timer.0.tick(time.delta()).just_finished() {
+        let mut rng = rand::rng();
+        commands.spawn(make_enemy_bundle(
+            Color::srgb(0.75, 0.25, 0.25),
+            Vec3::new(
+                rng.random_range(-200.0..200.0),
+                rng.random_range(-200.0..200.0),
+                0.0,
+            ),
+        ));
+    }
+}
+
 
 // write attack event when enemy collides with player
 fn enemy_attack_system(
