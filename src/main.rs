@@ -13,7 +13,7 @@ fn main() {
         .insert_resource(SpawnTimer(Timer::from_seconds(2.0, TimerMode::Repeating)))
         .add_systems(Update, enemy_spawn_system)
         .add_systems(Update, 
-            (enemy_attack_system, handle_attack_events, enemy_move_system))
+            (enemy_attack_system, handle_attack_events, toward_player_system))
         .add_systems(Update, lifebar_system)
         .add_plugins(EguiPlugin::default())
         .add_systems(EguiPrimaryContextPass, ui_system)
@@ -182,16 +182,20 @@ fn enemy_attack_system(
     }
 }
 
-fn enemy_move_system(
-    mut enemy_query: Query<&mut Transform, (With<Enemy>, Without<Player>)>,
-    player_query: Query<&Transform, (With<Player>, Without<Enemy>)>,
+#[derive(Component)]
+struct TowardPlayer{
+    speed: f32,
+}
+
+fn toward_player_system(
+    mut enemy_query: Query<(&mut Transform, &TowardPlayer), Without<Player>>,
+    player_query: Query<&Transform, (With<Player>, Without<TowardPlayer>)>,
     time: Res<Time>,
 ) {
     if let Ok(player_transform) = player_query.single() {
-        for mut enemy_transform in enemy_query.iter_mut() {
+        for (mut enemy_transform, toward_player) in enemy_query.iter_mut() {
             let direction = (player_transform.translation - enemy_transform.translation).normalize();
-            const ENEMY_MOVE_SPEED:f32 = 50.0;
-            enemy_transform.translation += direction * ENEMY_MOVE_SPEED * time.delta_secs();
+            enemy_transform.translation += direction * toward_player.speed * time.delta_secs();
         }
     }
 }
