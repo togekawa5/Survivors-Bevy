@@ -17,6 +17,7 @@ fn main() {
         .add_systems(Update, lifebar_system)
         .add_plugins(EguiPlugin::default())
         .add_systems(EguiPrimaryContextPass, ui_system)
+        .add_systems(Update, player_attack_system)
         .run();
 }
 
@@ -56,6 +57,19 @@ fn setup(mut commands: Commands) {
     commands.spawn(make_enemy_bundle(
         Color::srgb(0.75, 0.25, 0.25),
         Vec3::new(100.0, 0.0, 0.0),
+    ));
+    //攻撃エリア
+    commands.spawn((
+        Sprite{
+            color: Color::srgb(0.75, 0.75, 0.25),
+            custom_size: Some(Vec2::new(50.0, 50.0)),
+            ..Default::default()
+        },
+        AttackArea,
+        Attack { damage: 20 },
+        RigidBody::Kinematic,
+        Collider::rectangle(50.0, 50.0),
+        CollisionEventsEnabled,
     ));
 }
 
@@ -116,6 +130,8 @@ struct AttacEvent{
     target: Entity,
 }
 
+#[derive(Component)]
+struct AttackArea;
 
 fn make_enemy_bundle(
     color: Color,
@@ -129,6 +145,7 @@ fn make_enemy_bundle(
         },
         Transform::from_translation(position),
         Enemy,
+        TowardPlayer{ speed: 50.0 },
         RigidBody::Kinematic,
         Collider::rectangle(30.0, 30.0),
         Health { current: 50, max: 50 },
@@ -178,6 +195,31 @@ fn enemy_attack_system(
                 (*entity2, *entity1)
             };
             attack_events.write(AttacEvent { attacker, target });
+        }
+    }
+}
+
+fn player_attack_system(
+    mut collisions: EventReader<CollisionStarted>,
+    mut attack_events: EventWriter<AttacEvent>,
+    attack_area_query: Query<Entity, With<AttackArea>>,
+    enemy_query: Query<Entity, With<Enemy>>,
+) {
+    for CollisionStarted(entity1, entity2) in collisions.read(){
+        let entity1_is_enemy = enemy_query.get(*entity1).is_ok();
+        let entity2_is_enemy = enemy_query.get(*entity2).is_ok();
+        let entity1_is_attack_area = attack_area_query.get(*entity1).is_ok();
+        let entity2_is_attack_area = attack_area_query.get(*entity2).is_ok();
+
+        if (entity1_is_attack_area && entity2_is_enemy) || (entity1_is_enemy && entity2_is_attack_area) {
+            let (attacker, target) = if entity1_is_attack_area {
+                (*entity1, *entity2)
+            } else {
+                (*entity2, *entity1)
+            };
+            if let Ok(attacker_entity) = attack_area_query.single() {
+                attack_events.write(AttacEvent { attacker: attacker_entity, target });
+            }
         }
     }
 }
